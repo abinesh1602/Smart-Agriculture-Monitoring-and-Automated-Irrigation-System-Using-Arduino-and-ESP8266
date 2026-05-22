@@ -1,0 +1,103 @@
+		/**************** BLYNK DETAILS ****************/
+#define BLYNK_TEMPLATE_ID "TMPLxxxxxx"
+#define BLYNK_TEMPLATE_NAME "Temp & Air Pollution"
+#define BLYNK_AUTH_TOKEN "YourAuthToken"
+
+#define BLYNK_PRINT Serial
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+
+/**************** WIFI DETAILS ****************/
+char ssid[] = "Ungal_Nanban";
+char pass[] = "12345678";
+
+/**************** DHT SETTINGS ****************/
+#include <DHT.h>
+#define DHTPIN D4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+/**************** OLED SETTINGS ****************/
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+/**************** MQ-6 ****************/
+#define MQ6_PIN A0
+
+BlynkTimer timer;
+
+/**************** SENSOR READ FUNCTION ****************/
+void readSensors()
+{
+  float temperature = dht.readTemperature();
+  int gasValue = analogRead(MQ6_PIN);
+
+  // Serial Monitor
+  Serial.print("Temp: ");
+  Serial.print(temperature);
+  Serial.print(" C | Gas: ");
+  Serial.println(gasValue);
+
+  // Send to Blynk
+  Blynk.virtualWrite(V0, temperature);
+  Blynk.virtualWrite(V1, gasValue);
+
+  // OLED Display
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.print("Temp: ");
+  display.print(temperature);
+  display.println(" C");
+
+  display.setCursor(0, 20);
+  display.print("Gas : ");
+  display.println(gasValue);
+
+  display.setCursor(0, 40);
+  if (gasValue > 400)
+    display.println("Status: POLLUTED");
+  else
+    display.println("Status: NORMAL");
+
+  display.display();
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  dht.begin();
+
+  // OLED init
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED failed");
+    while (true);
+  }
+
+  display.clearDisplay();
+  display.setCursor(0, 20);
+  display.println("System Starting...");
+  display.display();
+
+  // Blynk init
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  // Read sensors every 2 seconds
+  timer.setInterval(2000L, readSensors);
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
